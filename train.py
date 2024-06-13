@@ -253,7 +253,7 @@ def append_QA_to_file(eval_log, answer,question,filename):
 def train(qa_model, dataset, valid_dataset, args,result_filename=None):
     num_workers = 5
     optimizer = torch.optim.Adam(qa_model.parameters(), lr=args.lr)
-    #scheduler = ReduceLROnPlateau(optimizer, mode='min', \
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', \
     #                              patience=3, verbose=True, factor=0.8)
     optimizer.zero_grad()
     batch_size = args.batch_size
@@ -356,7 +356,7 @@ if args.model in ['ctrn']:
     if args.mode == 'train':
         dataset = QA_Dataset_CTRN(split=train_split, dataset_name=args.dataset_name, args=args)
         #valid_dataset = QA_Dataset_CTRN(split=args.eval_split, dataset_name=args.dataset_name, args=args)
-        test_dataset = QA_Dataset_CTRN(split=test, dataset_name=args.dataset_name, args=args)
+    test_dataset = QA_Dataset_CTRN(split=test, dataset_name=args.dataset_name, args=args)
 else:
     print('Model %s not implemented!' % args.model)
     exit(0)
