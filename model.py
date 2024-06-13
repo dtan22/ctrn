@@ -128,9 +128,8 @@ class CTRN(nn.Module):
 	def getQuestionEmbedding(self, question_tokenized, attention_mask):
 		roberta_states = self.lm_model(question_tokenized, attention_mask=attention_mask)
 		states = roberta_states.transpose(1,0)
-        cls_embedding = states[0]
-        question_embedding = cls_embedding
-        #question_embedding = torch.mean(roberta_states, dim=1)
+		cls_embedding = states[0]
+		question_embedding = cls_embedding
 		return question_embedding, cls_embedding
 
 	# scoring function from TComplEx
