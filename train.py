@@ -254,7 +254,7 @@ def train(qa_model, dataset, valid_dataset, args,result_filename=None):
     num_workers = 5
     optimizer = torch.optim.Adam(qa_model.parameters(), lr=args.lr)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', \
-    #                              patience=3, verbose=True, factor=0.8)
+                                  patience=3, verbose=True, factor=0.8)
     optimizer.zero_grad()
     batch_size = args.batch_size
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
