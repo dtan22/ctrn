@@ -11,7 +11,7 @@ from utils import loadTkbcModel, loadTkbcModel_complex, print_info
 from collections import defaultdict
 from datetime import datetime
 from collections import OrderedDict
-import schedule
+
 parser = argparse.ArgumentParser(
     description="Temporal KGQA"
 )
