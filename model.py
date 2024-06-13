@@ -127,9 +127,14 @@ class CTRN(nn.Module):
 
 	def getQuestionEmbedding(self, question_tokenized, attention_mask):
 		roberta_states = self.lm_model(question_tokenized, attention_mask=attention_mask)
-		states = roberta_states.transpose(1,0)
+		question_embedding = roberta_states[0]
+		# roberta_embedding = roberta_states[-1]
+		states = question_embedding.transpose(1, 0)
+		# states1 = roberta_embedding.transpose(1, 0)
 		cls_embedding = states[0]
-		question_embedding = cls_embedding
+		# question_embedding = cls_embedding
+		# question_embedding = roberta_last_hidden_states
+		# question_embedding = torch.mean(roberta_last_hidden_states, dim=1)
 		return question_embedding, cls_embedding
 
 	# scoring function from TComplEx
@@ -247,7 +252,6 @@ class CTRN(nn.Module):
 		# TKG embeddings
 		head_embedding = self.entity_time_embedding(heads)
 		tail_embedding = self.entity_time_embedding(tails)
-		tail_embedding2 = self.entity_time_embedding(tails2)
 		time_embedding = self.entity_time_embedding(times)
 
 
@@ -279,7 +283,7 @@ class CTRN(nn.Module):
 
 		if self.supervision == 'soft':
 
-			cls = self.linearT(cls_embedding)
+			cls = self.linear(cls_embedding)
 			gate_value = self.kg_gate1(torch.cat([h_e, cls], dim=-1)).sigmoid()
 			vq = gate_value * h_e + (1 - gate_value) * cls
 			cls_embedding = self.linearT(vq)
@@ -292,11 +296,6 @@ class CTRN(nn.Module):
 
 			time_pos_embeddings2 = t2_emb.unsqueeze(0).transpose(0, 1)
 			time_pos_embeddings2 = time_pos_embeddings2.expand(entity_time_embedding_projected.shape)
-			
-			if self.extra_entities == True and not self.training:   #this is for the created before & after questions - we expect one more entity
-				t3_emb = self.infer_time(tail_embedding2, head_embedding, cls_embedding)
-				t2_emb = t2_emb + t3_emb #for simplicity, can be omitted and treated as t3_emb
-
 			if self.fuse == 'cat':
 				entity_time_embedding_projected = self.lin_cat(
 					torch.cat((entity_time_embedding_projected, time_pos_embeddings1, time_pos_embeddings2), dim=-1))
@@ -321,7 +320,7 @@ class CTRN(nn.Module):
 		# Transformer information fusion layer
 		masked_entity_time_embedding = entity_time_embedding_projected * self.invert_binary_tensor(entity_mask)
 		# combined_embed = masked_question_embedding + entity_time_embedding_projected + deep_q
-		combined_embed = question_embedding1 * entity_mask + masked_entity_time_embedding
+		combined_embed = question_embedding1 + masked_entity_time_embedding
 
 		# also need to add position embedding
 		sequence_length = combined_embed.shape[1]
