@@ -2,7 +2,7 @@ import math
 import torch
 from torch import nn
 import numpy as np
-from transformers import DistilBertModel
+from transformers import DistilBertModel, BertTokenizer, BertModel
 from torch.nn import LayerNorm
 import copy
 import torch.nn.functional as F
@@ -17,8 +17,8 @@ class CTRN(nn.Module):
 		self.tkbc_embedding_dim = tkbc_model.embeddings[0].weight.shape[1]
 		self.sentence_embedding_dim = 768  # hardwired from
 
-		self.pretrained_weights = 'distilbert-base-uncased'
-		self.lm_model = DistilBertModel.from_pretrained(self.pretrained_weights)
+		self.pretrained_weights = 'bert-base-multilingual-cased'
+		self.lm_model = BertModel.from_pretrained(self.pretrained_weights)
 		if args.lm_frozen == 1:
 			print('Freezing LM params')
 			for param in self.lm_model.parameters():
