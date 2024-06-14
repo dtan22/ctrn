@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import utils
 from tqdm import tqdm
-from transformers import DistilBertTokenizer
+from transformers import DistilBertTokenizer, BertTokenizer, BertModel
 from torch.utils.data import Dataset
 import random
 from hard_supervision_functions import retrieve_times
@@ -20,8 +20,8 @@ class QA_Dataset(Dataset):
         questions = pickle.load(open(filename, 'rb'))
         
         #probably change for bert/roberta?
-        self.tokenizer_class = DistilBertTokenizer 
-        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        self.tokenizer_class = BertTokenizer
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
         
         self.all_dicts = utils.getAllDicts(dataset_name)
         print('Total questions = ', len(questions))
