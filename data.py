@@ -20,8 +20,8 @@ class QA_Dataset(Dataset):
         questions = pickle.load(open(filename, 'rb'))
         
         #probably change for bert/roberta?
-        self.tokenizer_class = BertTokenizer
-        self.tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
+        self.tokenizer_class = DistilBertTokenizer
+        self.tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
         
         self.all_dicts = utils.getAllDicts(dataset_name)
         print('Total questions = ', len(questions))
