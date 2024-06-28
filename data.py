@@ -270,7 +270,16 @@ class QA_Dataset_CTRN(QA_Dataset):
         times = self.all_dicts['tsstr2id'].keys()
         rels = self.all_dicts['rel2id'].keys()
         self.split = split
-        
+
+        if args.aware_module:
+            with open('./saved_pkl/e2rt.pkl', 'rb') as f:
+                self.e2rt = pickle.load(f)
+            with open('./saved_pkl/event2time.pkl', 'rb') as f:
+                self.event2time = pickle.load(f)
+            with open('./saved_pkl/e2tr.pkl', 'rb') as f:
+                self.e2tr = pickle.load(f)
+            self.implicit_parsing(self.data)
+            
         #This is hard supervision
         #args: given TKG, whether to corrupt hard, and how to use the reitrieved timestmaps
         self.data = retrieve_times(args.tkg_file, args.dataset_name, self.data, args.corrupt_hard, args.fuse)
@@ -286,6 +295,68 @@ class QA_Dataset_CTRN(QA_Dataset):
 
     def __len__(self):
         return len(self.data)
+        
+    def get_event_time(self, event):
+        c = self.event2time[event]
+        event_triples = list(c)
+        time = event_triples[0][3]
+        return time
+
+    def check_triples(self, q1, q2):
+        l = []
+        if type(q2) == list:
+            for i in q2:
+                l += self.check_triples(q1,i)
+        else:
+            for i in self.e2rt[(q1,q2)]:
+                l.append(i)
+            for i in self.e2rt[(q2,q1)]:
+                l.append(i)
+        return l
+
+    def get_neighbours(self, e):
+        tr = self.e2tr[e]
+        neighbours = []
+        for t in tr:
+            neighbours.append(t[0])
+            neighbours.append(t[2])
+        neighbours = set(neighbours)
+        neighbours.remove(e)
+        return list(neighbours)
+
+    def implicit_parsing(self, data):
+        # general extraction
+        for i in data:
+            b = list(i['annotation'].keys())
+            if 'event_head' in b:
+                c = i['annotation']['event_head']
+                if c[0]!='Q':
+                    continue
+                time = self.get_event_time(c)
+                if i['type'] != 'before_after':
+                    i['times'] = {int(time)}
+                i['annotation']['time'] = time
+                i['annotation']['event_head_bak'] = i['annotation']['event_head']
+                i['annotation']['event_head'] = time
+                i['paraphrases'][0] = i['paraphrases'][0].replace(self.all_dicts['wd_id_to_text'][c],time)
+
+        # speific extraction
+        for i in data:
+            if i['type'] == 'before_after':
+                if 'event_head' not in i['annotation'].keys():
+                    head = i['annotation']['head']
+                    tail = i['annotation']['tail']
+                    related_triples = self.check_triples(head,tail)
+                    if i['annotation']['type'] == 'before':
+                        index = 0
+                        time = related_triples[0][3]
+                    else:
+                        time = related_triples[-1][4]
+                    # i['times'] = {int(time)}
+                    #i['annotation']['time'] = time
+                    # NL replace
+                    text = self.all_dicts['wd_id_to_text'][head]
+                    i['paraphrases'][0] = i['paraphrases'][0].replace(text,time)
 
     def getEntityTimeTextIds(self, question, pp_id=0):
         keyword_dict = question['keyword_dicts'][pp_id]
@@ -367,6 +438,8 @@ class QA_Dataset_CTRN(QA_Dataset):
         end_times = []
         tails = []
         tails2 = []
+        types = []
+        rels = []
         question_text = []
         tokenized_question = []
         entity_time_ids_tokenized_question = []
@@ -432,13 +505,15 @@ class QA_Dataset_CTRN(QA_Dataset):
 
 
             time += num_total_entities
-
             heads.append(head)
             times.append(time)
             start_times.append(start_time)
             end_times.append(end_time)
             tails.append(tail)
             tails2.append(tail2)
+            types.append(question['type'])
+            rel = self.all_dicts['rel2id'][list(question['relations'])[0]]
+            rels.append(rel)
 
             tokenized, entity_time_final, entity_mask = self.get_entity_aware_tokenization(nl_question, et_text, et_ids)
             assert len(tokenized) == len(entity_time_final)
@@ -462,6 +537,8 @@ class QA_Dataset_CTRN(QA_Dataset):
                 'start_time': start_times,
                 'end_time': end_times,
                 'tail2': tails2,
+                'types':types,
+                'rels':rels,
                 'answers_arr': answers_arr}
 
     # tokenization function taken from NER code
@@ -498,8 +575,9 @@ class QA_Dataset_CTRN(QA_Dataset):
         time = data['time'][index]
         start_time = data['start_time'][index]
         end_time = data['end_time'][index]
-
-        return question_text, tokenized_question, entity_time_ids, entity_mask, head, tail, time, start_time, end_time, tail2, answers_single
+        types = data['types'][index]
+        rels = data['rels'][index]
+        return question_text, tokenized_question, entity_time_ids, entity_mask, head, tail, time, start_time, end_time, tail2, types, rels, answers_single
 
     def pad_for_batch(self, to_pad, padding_val, dtype=np.long):
         padded = np.ones([len(to_pad), len(max(to_pad, key=lambda x: len(x)))], dtype=dtype) * padding_val
@@ -535,19 +613,21 @@ class QA_Dataset_CTRN(QA_Dataset):
         # can make foll mask in forward function using attention mask
         # entity_time_ids_padded_mask = ~(attention_mask.bool())
 
-        heads = torch.from_numpy(np.array([item[4] for item in items]))
-        tails = torch.from_numpy(np.array([item[5] for item in items]))
-        times = torch.from_numpy(np.array([item[6] for item in items]))
-        start_times = torch.from_numpy(np.array([item[7] for item in items]))
-        end_times = torch.from_numpy(np.array([item[8] for item in items]))
-        
-        tails2 = torch.from_numpy(np.array([item[9] for item in items]))
+        entity_mask = data['entity_mask'][index]
+        head = data['head'][index]
+        tail = data['tail'][index]
+        tail2 = data['tail2'][index]
+        time = data['time'][index]
+        start_time = data['start_time'][index]
+        end_time = data['end_time'][index]
+        types = data['types'][index]
+        rels = data['rels'][index]
+        return question_text, tokenized_question, entity_time_ids, entity_mask, head, tail, time, start_time, end_time, tail2, types, rels, answers_single
 
         # answers_khot = torch.stack([item[4] for item in items])
-        answers_single = torch.from_numpy(np.array([item[10] for item in items]))
+        answers_single = torch.from_numpy(np.array([item[12] for item in items]))
 
-        return input_ids, attention_mask, entity_time_ids_padded, entity_mask_padded, heads, tails, times, start_times, end_times, tails2, answers_single
-    
+        return input_ids, attention_mask, entity_time_ids_padded, entity_mask_padded, heads, tails, times, start_times, end_times, tails2, types,rels, answers_single    
 
 
 
