@@ -11,7 +11,6 @@ class CTRN(nn.Module):
 	def __init__(self, tkbc_model, args):
 		super().__init__()
 		self.model = args.model
-		self.time_sensitivity = args.time_sensitivity 
 		self.supervision = args.supervision
 		self.extra_entities = args.extra_entities
 		self.fuse = args.fuse
@@ -49,11 +48,11 @@ class CTRN(nn.Module):
 
 		full_embed_matrix = torch.cat([ent_emb_matrix, time_emb_matrix], dim=0)
 		# +1 is for padding idx
-		self.entity_time_embedding = nn.Embedding(num_entities + num_times + 1,  
+		self.entity_time_embedding = nn.Embedding(num_entities + num_times + 1,
 												  self.tkbc_embedding_dim,
 												  padding_idx=num_entities + num_times)
 		self.entity_time_embedding.weight.data[:-1, :].copy_(full_embed_matrix)
-		self.num_entities = num_entities
+
 		if args.frozen == 1:
 			print('Freezing entity/time embeddings')
 			self.entity_time_embedding.weight.requires_grad = False
@@ -349,12 +348,7 @@ class CTRN(nn.Module):
 		relation_embedding1 = self.dropout(self.bn1(self.linear1(relation_embedding)))
 		relation_embedding2 = self.dropout(self.bn1(self.linear2(relation_embedding)))
 
-		if self.time_sensitivity: 
-			scores_time1 = self.score_time(head_embedding, tail_embedding, relation_embedding1)
-            		scores_time2 = torch.matmul(relation_embedding1, self.entity_time_embedding.weight.data[self.num_entities:-1, :].T) # cuz padding idx
-            		scores_time = torch.maximum(scores_time1, scores_time2)
-		else: 
-			scores_time = self.score_time(head_embedding, tail_embedding, relation_embedding1)
+		scores_time = self.score_time(head_embedding, tail_embedding, relation_embedding1)
 
 		scores_entity1 = self.score_entity(head_embedding, tail_embedding, relation_embedding2, time_embedding)
 		scores_entity2 = self.score_entity(tail_embedding, head_embedding, relation_embedding2, time_embedding)
