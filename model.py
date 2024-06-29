@@ -89,7 +89,7 @@ class CTRN(nn.Module):
 
 
 		self.Convolution = nn.Conv1d(1, 1, 3)
-		self.linearc = nn.Linear(766, 512)
+		self.linearc = nn.Linear(768, 512)
 
 		self.Line = nn.Linear(self.sentence_embedding_dim, self.tkbc_embedding_dim)
 		self.kg_gate = nn.Linear(2 * self.tkbc_embedding_dim, self.tkbc_embedding_dim)
