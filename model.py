@@ -369,7 +369,7 @@ class GCN(nn.Module):
 		self.layers = num_layers
 		self.mem_dim = mem_dim
 		self.in_dim = 768
-		self.linearc = nn.Linear(766, 768)
+		self.linearc = nn.Linear(768, 768)
 
 		self.fc = nn.Sequential(
 			nn.Linear(768, 768, bias=False),
