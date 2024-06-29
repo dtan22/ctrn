@@ -235,7 +235,7 @@ class CTRN(nn.Module):
 	def inputs_to_att_adj(self, input, score_mask):
 		attn_tensor = self.attn(input, input, score_mask)  # [batch_size, head_num, seq_len, seq_len]
 		attn_tensor = torch.sum(attn_tensor, dim=1)
-		# attn_tensor = select(attn_tensor, 2) * attn_tensor
+		attn_tensor = select(attn_tensor, 2) * attn_tensor
 		return attn_tensor
 
 	def forward(self, a):
