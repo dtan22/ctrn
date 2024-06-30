@@ -417,13 +417,18 @@ class GCN(nn.Module):
 			# concat the last layer's out with input_feature as the current input
 			inputs = torch.cat((inputs, out), dim=-1)
 			if type == 'semantic':
-				# att_adj
-				adj = self.attn[i - 1](inputs, inputs, score_mask)  # [batch_size, head_num, seq_len, dim]
-				probability = F.softmax(adj.sum(dim=(-2, -1)), dim=0)
-				max_idx = torch.argmax(probability, dim=1)
-				adj = torch.stack([adj[i][max_idx[i]] for i in range(len(max_idx))], dim=0)
-				adj = select(adj, 2) * adj
-				denom = adj.sum(2).unsqueeze(2) + 1  # norm adj
+                		# att_adj
+                		adj = self.attn[i - 1](inputs, inputs, score_mask)  # [batch_size, head_num, seq_len, dim]
+
+                		if self.args.second_layer == 'max':
+                    			probability = F.softmax(adj.sum(dim=(-2, -1)), dim=0)
+                    			max_idx = torch.argmax(probability, dim=1)
+                    			adj = torch.stack([adj[i][max_idx[i]] for i in range(len(max_idx))], dim=0)
+                		else:
+                    			adj = torch.sum(adj, dim=1)
+
+                		adj = select(adj, self.args.top_k) * adj
+                		denom = adj.sum(2).unsqueeze(2) + 1  # norm adj
 			out = self.GCN_layer(adj, inputs, denom, i)
 			out = self.fc(out)
 		return out
