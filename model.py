@@ -391,12 +391,20 @@ class GCN(nn.Module):
 
 			# attention adj layer
 			self.attn.append(MultiHeadAttention(3, input_dim)) if layer != 0 else None
+		# Add residual connections
+        	self.residual = nn.ModuleList([nn.Linear(input_dim, self.mem_dim) for _ in range(self.layers)])
+
+        	# Add batch normalization
+        	self.batch_norms = nn.ModuleList([nn.BatchNorm1d(self.mem_dim) for _ in range(self.layers)])
+
 
 	def GCN_layer(self, adj, gcn_inputs, denom, l):
 		Ax = adj.bmm(gcn_inputs)
 		AxW = self.W[l](Ax)
 		AxW = AxW / denom
 		gAxW = F.relu(AxW) + self.W[l](gcn_inputs)
+		gAxW = gAxW + self.residual[l](gcn_inputs)
+		gAxW = self.batch_norms[l](gAxW)
 		# if dataset is not laptops else gcn_inputs = self.gcn_drop(gAxW)
 		gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
 		return gcn_inputs
@@ -419,15 +427,11 @@ class GCN(nn.Module):
 			if type == 'semantic':
                 		# att_adj
                 		adj = self.attn[i - 1](inputs, inputs, score_mask)  # [batch_size, head_num, seq_len, dim]
-
-                		if self.args.second_layer == 'max':
-                    			probability = F.softmax(adj.sum(dim=(-2, -1)), dim=0)
-                    			max_idx = torch.argmax(probability, dim=1)
-                    			adj = torch.stack([adj[i][max_idx[i]] for i in range(len(max_idx))], dim=0)
-                		else:
-                    			adj = torch.sum(adj, dim=1)
-
-                		adj = select(adj, self.args.top_k) * adj
+                    		probability = F.softmax(adj.sum(dim=(-2, -1)), dim=0)
+                    		max_idx = torch.argmax(probability, dim=1)
+                    		adj = torch.stack([adj[i][max_idx[i]] for i in range(len(max_idx))], dim=0)
+                    		adj = torch.sum(adj, dim=1)
+				adj = select(adj, self.args.top_k) * adj
                 		denom = adj.sum(2).unsqueeze(2) + 1  # norm adj
 			out = self.GCN_layer(adj, inputs, denom, i)
 			out = self.fc(out)
